@@ -1,0 +1,4 @@
+#[Desktop Entry]
+Type=Application
+Name=HandleCarState
+Exec=python3 /home/pi/scripts/carpi/handle_car_state.py
