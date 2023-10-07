@@ -1,9 +1,9 @@
 # adjust screen brightness based on input from the car lights
-# upload logs to dropbox
 # shutdown when the GPIO17 goes low for 5 seconds
 import RPi.GPIO as GPIO
 import time
 import subprocess
+from pathlib import Path
 
 GPIO.setwarnings(False)
 GPIO.cleanup()
@@ -25,13 +25,19 @@ def applyBrightness(b):
 
 def uploadLogs():
 	try:
-        	output = subprocess.call('ping -c 2 www.dropbox.com', shell=True)
-        	if(output==0):
-                	print('Uploading to dropbox...')
-                	subprocess.call('/home/pi/scripts/dropbox_uploader.sh -s upload ~/*.csv /', timeout=120, shell=True)
-                	subprocess.call('rm ~/*.csv', shell=True)
+		output = subprocess.call('ping -c 2 www.dropbox.com', timeout=10, shell=True)
+		if(output==0):
+			print('\nUploading logs to dropbox...\n')
+			logs = Path('/home/pi').glob('*.csv')
+			for log in logs:
+				try:
+					print("Uploading to {logFilePath} to /".format(logFilePath=log))
+					subprocess.call("/home/pi/scripts/dropbox_uploader.sh upload {logFilePath} /".format(logFilePath=log), timeout=60, shell=True)
+					subprocess.call("rm {logFilePath}".format(logFilePath=log), shell=True)
+				except subprocess.TimeoutExpired:
+					print("\nFailed to upload {logFilePath}".format(logFilePath=log))
 	except subprocess.TimeoutExpired:
-        	print('\nDropbox upload timeout occurred...')
+		print('\nNo internet connection')
 
 
 brightnessHigh = 200
@@ -40,26 +46,25 @@ brightness = brightnessHigh # current brightness
 
 shutdownCounter = 0
 shutdownWaitTime = 5 # seconds to wait before shutting down after key off
-initialWaitTime = 10 # seconds to wait on startup in order to not interrupt PowerTune boot
+initialWaitTime = 10 # seconds to wait on startup in order to not interupt powertune boot
 
-time.sleep(initialWaitTime)
+time.sleep(initialWaitTime);
 
 while(True):
 	if (shutdownCounter >= shutdownWaitTime):
 		uploadLogs()
 		print('Shuting down...')
 		subprocess.call(['shutdown', '-h','now'])
-		#sys.exit("shutdown")
 	shutdownState = GPIO.input(SHUTDOWN_PIN)
 	lightState = GPIO.input(CAR_LIGHT_PIN)
-	
+
 	# Advance the shoutdown counter by 1 each second the
 	# shoutdown pin goes low
 	if (shutdownState == True):
 		shutdownCounter = 0
 	else:
 		shutdownCounter += 1
-	# Handle brightness
+
 	if lightState == True and brightness == brightnessHigh:
 		applyBrightness(brightnessLow)
 	elif lightState == False and brightness == brightnessLow:
