@@ -4,6 +4,7 @@ import RPi.GPIO as GPIO
 import time
 import subprocess
 from pathlib import Path
+from datetime import datetime
 
 GPIO.setwarnings(False)
 GPIO.cleanup()
@@ -26,13 +27,13 @@ def applyBrightness(b):
 def uploadLogs():
 	try:
 		output = subprocess.call('ping -c 2 www.dropbox.com', timeout=10, shell=True)
+		targetFolder = datetime.today().strftime('%Y-%m-%d')
 		if(output==0):
-			print('\nUploading logs to dropbox...\n')
+			print("\nUploading logs to dropbox under /{targetFolder}/\n".format(targetFolder=targetFolder))
 			logs = Path('/home/pi').glob('*.csv')
 			for log in logs:
 				try:
-					print("Uploading to {logFilePath} to /".format(logFilePath=log))
-					subprocess.call("/home/pi/scripts/dropbox_uploader.sh upload {logFilePath} /".format(logFilePath=log), timeout=60, shell=True)
+					subprocess.call("/home/pi/scripts/dropbox_uploader.sh upload {logFilePath} /{targetFolder}/".format(logFilePath=log, targetFolder=targetFolder), timeout=60, shell=True)
 					subprocess.call("rm {logFilePath}".format(logFilePath=log), shell=True)
 				except subprocess.TimeoutExpired:
 					print("\nFailed to upload {logFilePath}".format(logFilePath=log))
