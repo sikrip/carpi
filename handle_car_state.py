@@ -3,6 +3,9 @@
 import RPi.GPIO as GPIO
 import time
 import subprocess
+import requests
+import json
+from datetime import datetime
 from pathlib import Path
 
 GPIO.setwarnings(False)
@@ -16,6 +19,30 @@ GPIO.setup(CAR_LIGHT_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 SHUTDOWN_PIN = 17 # input form the key on relay
 GPIO.setup(SHUTDOWN_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
+logFilesPath = '/home/pi'
+dropboxApiKey = ''
+
+def dropboxUpload(file):
+    time = datetime.now()
+    
+    dropboxUploadArg = {
+    "path": "/{folder}/{fileName}".format(folder=time.strftime("%Y-%m-%d"), fileName=file.name),
+    "mode": "overwrite",
+    "strict_conflict": False
+    }
+    
+    headers = {
+        'Authorization': 'Bearer {apiKey}'.format(apiKey=dropboxApiKey),
+        'Dropbox-API-Arg': json.dumps(dropboxUploadArg),
+        'Content-Type': 'application/octet-stream'
+    }
+
+    data = '@{localFile}'.format(localFile=file)
+
+
+    response = requests.post('https://content.dropboxapi.com/2/files/upload', headers=headers, data=data)
+    return response.status_code
+
 def applyBrightness(b):
 	global brightness
 	brightness = b
@@ -28,14 +55,15 @@ def uploadLogs():
 		output = subprocess.call('ping -c 2 www.dropbox.com', timeout=10, shell=True)
 		if(output==0):
 			print('\nUploading logs to dropbox...\n')
-			logs = Path('/home/pi').glob('*.csv')
-			for log in logs:
+			logFiles = Path(logFilesPath).glob('*.csv')
+			for logFile in logFiles:
 				try:
-					print("Uploading to {logFilePath} to /".format(logFilePath=log))
-					subprocess.call("/home/pi/scripts/dropbox_uploader.sh upload {logFilePath} /".format(logFilePath=log), timeout=60, shell=True)
-					subprocess.call("rm {logFilePath}".format(logFilePath=log), shell=True)
+					print("Uploading {logFilePath}".format(logFilePath=logFile))
+					if(dropboxUpload(logFile)==200):
+					    print("Removing {logFilePath}".format(logFilePath=logFile))
+					    subprocess.call("rm {logFilePath}".format(logFilePath=logFile), shell=True)
 				except subprocess.TimeoutExpired:
-					print("\nFailed to upload {logFilePath}".format(logFilePath=log))
+					print("\nFailed to upload {logFilePath}".format(logFilePath=logFile))
 	except subprocess.TimeoutExpired:
 		print('\nNo internet connection')
 
