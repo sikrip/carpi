@@ -37,10 +37,11 @@ def dropboxUpload(file):
         'Content-Type': 'application/octet-stream'
     }
 
-    data = '@{localFile}'.format(localFile=file)
-
-
-    response = requests.post('https://content.dropboxapi.com/2/files/upload', headers=headers, data=data)
+    with open(file, "rb") as f:
+        data = f.read()
+        response = requests.post('https://content.dropboxapi.com/2/files/upload', headers=headers, data=data)
+        print(response)
+        f.close()
     return response.status_code
 
 def applyBrightness(b):
