@@ -1,10 +1,9 @@
 # adjust screen brightness based on input from the car lights
 # shutdown when the GPIO17 goes low for 5 seconds
+# Using https://github.com/andreafabrizi/Dropbox-Uploader to upload to dropbox
 import RPi.GPIO as GPIO
 import time
 import subprocess
-import requests
-import json
 from datetime import datetime
 from pathlib import Path
 
@@ -24,25 +23,9 @@ dropboxApiKey = ''
 
 def dropboxUpload(file):
     time = datetime.now()
-    
-    dropboxUploadArg = {
-    "path": "/{folder}/{fileName}".format(folder=time.strftime("%Y-%m-%d"), fileName=file.name),
-    "mode": "overwrite",
-    "strict_conflict": False
-    }
-    
-    headers = {
-        'Authorization': 'Bearer {apiKey}'.format(apiKey=dropboxApiKey),
-        'Dropbox-API-Arg': json.dumps(dropboxUploadArg),
-        'Content-Type': 'application/octet-stream'
-    }
-
-    with open(file, "rb") as f:
-        data = f.read()
-        response = requests.post('https://content.dropboxapi.com/2/files/upload', headers=headers, data=data)
-        print(response)
-        f.close()
-    return response.status_code
+    dropboxFilePath = "/{folder}/{fileName}".format(folder=time.strftime("%Y-%m-%d"), fileName=file.name)
+    output = subprocess.call('./dropbox_uploader.sh -s upload {localFilePath} {dropboxFilePath}'.format(localFilePath=file, dropboxFilePath=dropboxFilePath), timeout=120, shell=True)
+    return output==0
 
 def applyBrightness(b):
 	global brightness
@@ -60,7 +43,7 @@ def uploadLogs():
 			for logFile in logFiles:
 				try:
 					print("Uploading {logFilePath}".format(logFilePath=logFile))
-					if(dropboxUpload(logFile)==200):
+					if(dropboxUpload(logFile)):
 					    print("Removing {logFilePath}".format(logFilePath=logFile))
 					    subprocess.call("rm {logFilePath}".format(logFilePath=logFile), shell=True)
 				except subprocess.TimeoutExpired:
